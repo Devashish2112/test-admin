@@ -8,18 +8,26 @@ interface Alert {
   _id: string;
   title: string;
   description: string;
+  severity: string;
   category: string;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  image_url: string | null;
-  status: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  source?: string;
   created_at: string;
-  updated_at: string;
-  reporter_name: string;
-  reporter_email: string;
-  verified_by_name: string | null;
+  updated_at?: string;
+  created_by_name?: string;
+}
+
+export interface AlertCreate {
+  title: string;
+  description: string;
+  severity: string;
+  category: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  source?: string;
 }
 
 interface AlertsState {
@@ -52,9 +60,14 @@ export const fetchAlerts = createAsyncThunk(
 
 export const createNewAlert = createAsyncThunk(
   'alerts/createAlert',
-  async (data: Omit<Alert, '_id' | 'created_at' | 'updated_at' | 'verified_by_name'>) => {
-    const response = await createAlert(data);
-    return response.data;
+  async (data: AlertCreate) => {
+    try {
+      const response = await createAlert(data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating alert:', error);
+      throw error;
+    }
   }
 );
 
@@ -99,12 +112,21 @@ const alertsSlice = createSlice({
         state.error = action.error.message || 'Failed to fetch alerts';
       })
       // Create Alert
+      .addCase(createNewAlert.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(createNewAlert.fulfilled, (state, action) => {
+        state.loading = false;
         if (!Array.isArray(state.alerts)) {
           state.alerts = [];
         }
         state.alerts.unshift(action.payload);
         state.total += 1;
+      })
+      .addCase(createNewAlert.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to create alert';
       })
       // Update Alert Status
       .addCase(updateAlertStatus.pending, (state) => {

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { getDashboardStats, getIncidentAnalytics, getAlertAnalytics } from '../../services/api';
+import { getDashboardStats, getIncidentAnalytics, getAlertAnalytics, updateVolunteer, updateIncident, updateAlertStatus as apiUpdateAlertStatus } from '../../services/api';
 import axios from 'axios';
 
 interface DashboardStats {
@@ -37,32 +37,72 @@ const initialState: DashboardState = {
 
 export const fetchDashboardStats = createAsyncThunk(
   'dashboard/fetchStats',
-  async () => {
+  async (_, { rejectWithValue }) => {
     try {
+      console.log('Fetching dashboard stats...');
       const response = await getDashboardStats();
-      return response.data || {};
+      console.log('Dashboard stats response:', response.data);
+      if (!response.data) {
+        return rejectWithValue('No data returned from the API');
+      }
+      return response.data;
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      throw error;
+      let errorMessage = 'Failed to fetch dashboard stats';
+      
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message 
+          || `Server error: ${error.response?.status}` 
+          || error.message 
+          || errorMessage;
+          
+        console.error('API Error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+      }
+      
+      return rejectWithValue(errorMessage);
     }
   }
 );
 
 export const fetchAnalytics = createAsyncThunk(
   'dashboard/fetchAnalytics',
-  async (period: '7d' | '30d' | '90d' | '1y') => {
+  async (period: '7d' | '30d' | '90d' | '1y', { rejectWithValue }) => {
     try {
+      console.log(`Fetching analytics for period: ${period}`);
       const [incidentResponse, alertResponse] = await Promise.all([
         getIncidentAnalytics(period),
         getAlertAnalytics(period),
       ]);
+      
+      console.log('Incidents analytics response:', incidentResponse.data);
+      console.log('Alerts analytics response:', alertResponse.data);
+      
       return {
         incidents: incidentResponse.data || [],
         alerts: alertResponse.data || [],
       };
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      throw error;
+      let errorMessage = 'Failed to fetch analytics data';
+      
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message 
+          || `Server error: ${error.response?.status}` 
+          || error.message 
+          || errorMessage;
+          
+        console.error('API Error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+      }
+      
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -70,7 +110,7 @@ export const fetchAnalytics = createAsyncThunk(
 export const updateVolunteerStatus = createAsyncThunk(
   'dashboard/updateVolunteerStatus',
   async ({ volunteerId, status }: { volunteerId: number; status: string }) => {
-    const response = await axios.put(`/api/admin/volunteers/${volunteerId}/status`, { status });
+    const response = await updateVolunteer(volunteerId.toString(), { status });
     return response.data;
   }
 );
@@ -78,7 +118,7 @@ export const updateVolunteerStatus = createAsyncThunk(
 export const updateIncidentStatus = createAsyncThunk(
   'dashboard/updateIncidentStatus',
   async ({ incidentId, status }: { incidentId: string; status: string }) => {
-    const response = await axios.put(`/api/admin/incidents/${incidentId}/status`, { status });
+    const response = await updateIncident(incidentId, { status });
     return { incidentId, status, message: response.data.message };
   }
 );
@@ -86,7 +126,7 @@ export const updateIncidentStatus = createAsyncThunk(
 export const updateAlertStatus = createAsyncThunk(
   'dashboard/updateAlertStatus',
   async ({ alertId, status }: { alertId: string; status: string }) => {
-    const response = await axios.put(`/api/admin/alerts/${alertId}/status`, { status });
+    const response = await apiUpdateAlertStatus(Number(alertId), { status });
     return response.data;
   }
 );
@@ -94,7 +134,11 @@ export const updateAlertStatus = createAsyncThunk(
 const dashboardSlice = createSlice({
   name: 'dashboard',
   initialState,
-  reducers: {},
+  reducers: {
+    clearErrors: (state) => {
+      state.error = null;
+    }
+  },
   extraReducers: (builder) => {
     builder
       // Fetch Stats
@@ -119,7 +163,8 @@ const dashboardSlice = createSlice({
       })
       .addCase(fetchDashboardStats.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to fetch dashboard stats';
+        state.error = action.payload as string || action.error.message || 'Failed to fetch dashboard stats';
+        console.error('Dashboard stats fetch rejected:', action.payload || action.error.message);
       })
       // Fetch Analytics
       .addCase(fetchAnalytics.pending, (state) => {

@@ -101,10 +101,34 @@ const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
   const { stats, incidentAnalytics, alertAnalytics, loading, error } = useAppSelector((state) => state.dashboard);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('7d');
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchDashboardStats());
-    dispatch(fetchAnalytics(timeRange));
+    console.log('Fetching dashboard data...');
+    try {
+      dispatch(fetchDashboardStats())
+        .unwrap()
+        .then((result) => {
+          console.log('Dashboard stats result:', result);
+        })
+        .catch((err) => {
+          console.error('Error fetching dashboard stats:', err);
+          setLocalError('Failed to load dashboard statistics. Please check your network connection.');
+        });
+
+      dispatch(fetchAnalytics(timeRange))
+        .unwrap()
+        .then((result) => {
+          console.log('Analytics result:', result);
+        })
+        .catch((err) => {
+          console.error('Error fetching analytics:', err);
+          setLocalError('Failed to load analytics data. Please check your network connection.');
+        });
+    } catch (err) {
+      console.error('General error in fetching dashboard data:', err);
+      setLocalError('An unexpected error occurred. Please try again later.');
+    }
   }, [dispatch, timeRange]);
 
   const handleVolunteerStatusUpdate = async (volunteerId: number, status: string) => {
@@ -149,17 +173,43 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error || localError) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
+        <Alert severity="error" sx={{ borderRadius: 2, mb: 2 }}>
+          {error || localError}
+        </Alert>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => {
+            setLocalError(null);
+            dispatch(fetchDashboardStats());
+            dispatch(fetchAnalytics(timeRange));
+          }}
+        >
+          Try Again
+        </Button>
       </Box>
     );
   }
 
   if (!stats) {
-    return null;
+    console.log('Stats is null or undefined:', stats);
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+          No dashboard data available. Please check your API connection.
+        </Alert>
+        <pre>{JSON.stringify({ stats, loading, error }, null, 2)}</pre>
+      </Box>
+    );
   }
+
+  // Debug information
+  console.log('Dashboard render with stats:', stats);
+  console.log('Recent incidents:', stats.recent_incidents);
+  console.log('Recent alerts:', stats.recent_alerts);
 
   // Ensure stats values are defined
   const totalStats = [
