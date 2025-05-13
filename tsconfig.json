@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": "src",
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "paths": {
+      "@mui/material/*": ["node_modules/@mui/material/*"],
+      "@mui/icons-material/*": ["node_modules/@mui/icons-material/*"],
+      "@emotion/*": ["node_modules/@emotion/*"]
+    }
+  },
+  "include": ["src", "src/types/custom.d.ts"],
+  "exclude": ["node_modules"]
+} 
